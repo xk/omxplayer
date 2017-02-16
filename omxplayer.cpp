@@ -151,7 +151,7 @@ void print_keybindings()
 
 void print_version()
 {
-  printf("omxplayer - Commandline multimedia player for the Raspberry Pi\n");
+  printf("omxplayer - v6\n");
   printf("        Build date: %s\n", VERSION_DATE);
   printf("        Version   : %s [%s]\n", VERSION_HASH, VERSION_BRANCH);
   printf("        Repository: %s\n", VERSION_REPO);
@@ -516,6 +516,7 @@ int main(int argc, char *argv[])
   bool                  m_refresh             = false;
   double                startpts              = 0;
   uint32_t              m_blank_background    = 0;
+  bool                  m_step_once           = true;
   bool sentStarted = false;
   float m_threshold      = -1.0f; // amount of audio/video required to come out of buffering
   float m_timeout        = 10.0f; // amount of time file/network operation can stall for before timing out
@@ -1190,7 +1191,7 @@ int main(int argc, char *argv[])
       m_last_check_time = now;
     }
 
-     if (update) {
+    if (update) {
        OMXControlResult result = control_err
                                ? (OMXControlResult)(m_keyboard ? m_keyboard->getEvent() : KeyConfig::ACTION_BLANK)
                                : m_omxcontrol.getEvent();
@@ -1531,6 +1532,20 @@ int main(int argc, char *argv[])
       default:
         break;
     }
+    
+    if (m_Pause) {
+      int buffered= m_player_video.GetLevel();
+      if (!m_omx_reader.IsEof() && buffered < 85.0) {
+        m_step_once= true;
+        //printf("Reset (%d%%)\n", buffered);
+      }
+      if (m_step_once && ((buffered > 85.0) || m_omx_reader.IsEof())) {
+        m_step_once = false;
+        m_av_clock->OMXStep();
+        printf("READY TO PLAY\n", buffered);
+        CLog::Log(LOGDEBUG, "*** Step once (%d%%)\n", buffered);
+      }
+    }
     }
 
     if (idle)
@@ -1652,6 +1667,7 @@ int main(int argc, char *argv[])
 
       if(m_tv_show_info)
       {
+        //printf("m_tv_show_info\n");
         static unsigned count;
         if ((count++ & 7) == 0)
         {
